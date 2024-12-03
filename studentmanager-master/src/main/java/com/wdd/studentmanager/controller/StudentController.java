@@ -139,48 +139,71 @@ public class StudentController {
      */
     @RequestMapping("/addStudent")
     @ResponseBody
-    public AjaxResult addStudent(@RequestParam("file") MultipartFile[] files,Student student) throws IOException {
-
+    public AjaxResult addStudent(@RequestParam("file") MultipartFile[] files, Student student) throws IOException {
         AjaxResult ajaxResult = new AjaxResult();
         student.setSn(SnGenerateUtil.generateSn(student.getClazzId()));
 
         // 存放上传图片的文件夹
         File fileDir = UploadUtil.getImgDirFile();
-        for(MultipartFile fileImg : files){
+        List<String> photoPaths = new ArrayList<>();
 
-            // 拿到文件名
-            String extName = Objects.requireNonNull(fileImg.getOriginalFilename()).substring(fileImg.getOriginalFilename().lastIndexOf("."));
+        for (MultipartFile fileImg : files) {
+            if (fileImg.isEmpty()) {
+                continue; // 跳过空文件
+            }
+
+            // 获取文件名
+            String originalFilename = fileImg.getOriginalFilename();
+            if (originalFilename == null || originalFilename.isEmpty()) {
+                ajaxResult.setSuccess(false);
+                ajaxResult.setMessage("文件名为空");
+                return ajaxResult;
+            }
+
+            // 获取文件扩展名
+            int dotIndex = originalFilename.lastIndexOf(".");
+            String extName = (dotIndex >= 0) ? originalFilename.substring(dotIndex) : "";
+
             String uuidName = UUID.randomUUID().toString();
 
             try {
                 // 构建真实的文件路径
-                File newFile = new File(fileDir.getAbsolutePath() + File.separator +uuidName+ extName);
+                File newFile = new File(fileDir.getAbsolutePath() + File.separator + uuidName + extName);
 
                 // 上传图片到 -》 “绝对路径”
                 fileImg.transferTo(newFile);
 
+                // 保存图片路径
+                photoPaths.add(uuidName + extName);
             } catch (IOException e) {
                 e.printStackTrace();
+                ajaxResult.setSuccess(false);
+                ajaxResult.setMessage("图片上传失败");
+                return ajaxResult;
             }
-            student.setPhoto(uuidName+extName);
         }
-        //保存学生信息到数据库
-        try{
+
+        // 设置学生照片路径
+        if (!photoPaths.isEmpty()) {
+            student.setPhoto(String.join(",", photoPaths));
+        }
+
+        // 保存学生信息到数据库
+        try {
             int count = studentService.addStudent(student);
-            if(count > 0){
+            if (count > 0) {
                 ajaxResult.setSuccess(true);
                 ajaxResult.setMessage("保存成功");
-            }else{
+            } else {
                 ajaxResult.setSuccess(false);
                 ajaxResult.setMessage("保存失败");
             }
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
             ajaxResult.setSuccess(false);
             ajaxResult.setMessage("保存失败");
         }
 
-        ajaxResult.setSuccess(true);
         return ajaxResult;
     }
 
